@@ -1,8 +1,23 @@
-# Predictive Analysis of Cancer — FIAP Tech Challenge
+# 🎗️ Predictive Analysis of Cancer — FIAP Tech Challenge
 
 Classificação de tumores como benignos ou malignos com base no [Breast Cancer Wisconsin Dataset](https://www.kaggle.com/datasets/uciml/breast-cancer-wisconsin-data/data), utilizando quatro modelos de machine learning: Logistic Regression, Random Forest, Gradient Boosting e KNN.
 
-## Estrutura do projeto
+
+## 👥 Team
+
+| Name |
+|---|
+| [Bruno Gouveia Schoola](https://github.com/bschoola) |
+| [Ricardo Stebulaitis](https://github.com/stebulaitis) |
+
+
+## 🎯 Objective
+
+
+[...]
+
+
+## 🗂️ Estrutura do projeto
 
 ```
 ├── main.py                  # Entry point — executa o pipeline completo
@@ -16,7 +31,7 @@ Classificação de tumores como benignos ou malignos com base no [Breast Cancer 
     └── explainability.py    # Análise SHAP e importância de features
 ```
 
-## Como executar
+## 🚀 Como executar
 
 ```bash
 # Crie e ative o ambiente virtual
@@ -28,7 +43,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## Modelos avaliados
+## 🏆 Modelos avaliados
 
 | Modelo | Observação |
 |---|---|
@@ -37,11 +52,11 @@ python main.py
 | Gradient Boosting | Boosting sequencial com sklearn |
 | KNN | Classificação por proximidade (k=5), requer normalização |
 
-## Features selecionadas
+## 🔬 Features selecionadas
 
 `area_pior`, `textura_pior`, `pontos_concavos_pior`, `concavidade_pior`
 
-## Métricas de avaliação
+## 🤖 Métricas de avaliação
 
 - **Accuracy** — proporção de predições corretas
 - **Precision** — dos classificados como malignos, quantos realmente eram
@@ -51,6 +66,6 @@ python main.py
 
 O **Recall** é a métrica mais crítica neste contexto: um Falso Negativo significa não detectar um tumor maligno, impedindo o início do tratamento.
 
-## Explicabilidade
+## 📓 Explicabilidade
 
 A análise SHAP (via `LinearExplainer`) é aplicada sobre a Logistic Regression para identificar o impacto de cada feature nas predições. A feature `area_pior` apresenta o maior peso no modelo.
