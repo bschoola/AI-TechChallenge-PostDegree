@@ -1,0 +1,28 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary:        #1565C0;
+  --primary-dark:   #0D47A1;
+  --primary-light:  #E3F2FD;
+  --primary-medium: #42A5F5;
+  --bg:             #EEF2F7;
+  --card-bg:        #FFFFFF;
+  --text:           #1A2332;
+  --text-muted:     #5A6A7E;
+  --border:         #D6E4F0;
+  --shadow:         0 2px 16px rgba(21, 101, 192, 0.10);
+  --danger:         #C62828;
+  --danger-light:   #FFEBEE;
+  --danger-border:  #EF9A9A;
+  --success:        #2E7D32;
+  --success-light:  #E8F5E9;
+  --success-border: #A5D6A7;
+  --radius:         12px;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
