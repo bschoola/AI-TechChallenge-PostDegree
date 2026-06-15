@@ -46,4 +46,47 @@ SELECTED_FEATURES = [
 
 RANDOM_STATE = 42
 TEST_SIZE = 0.2
-CV_FOLDS = 10
+CV_FOLDS = 5
+
+# Espaço de busca para otimização por algoritmo genético
+# Cada gene é um índice na lista correspondente
+HP_C_VALUES = [0.001, 0.01, 0.1, 1, 10, 100]
+HP_PENALTY_VALUES = ["l1", "l2"]
+HP_MAX_ITER_VALUES = [100, 200, 500, 1000, 2000]
+HP_CLASS_WEIGHT_VALUES = [None, "balanced"]
+
+# Gene lengths for bounds checking: [len(C), len(penalty), len(max_iter), len(class_weight)]
+HP_GENE_SIZES = [
+    len(HP_C_VALUES),
+    len(HP_PENALTY_VALUES),
+    len(HP_MAX_ITER_VALUES),
+    len(HP_CLASS_WEIGHT_VALUES),
+]
+
+# 3 experimentos com diferentes configurações do algoritmo genético
+GA_EXPERIMENTS = [
+    {
+        "name": "Exp1 — Pop. Pequena / Mutação Alta",
+        "population_size": 10,
+        "generations": 20,
+        "mutation_rate": 0.30,
+        "crossover_rate": 0.80,
+        "tournament_size": 3,
+    },
+    {
+        "name": "Exp2 — Pop. Média / Mutação Média",
+        "population_size": 20,
+        "generations": 15,
+        "mutation_rate": 0.20,
+        "crossover_rate": 0.80,
+        "tournament_size": 3,
+    },
+    {
+        "name": "Exp3 — Pop. Grande / Mutação Baixa",
+        "population_size": 30,
+        "generations": 25,
+        "mutation_rate": 0.10,
+        "crossover_rate": 0.90,
+        "tournament_size": 3,
+    },
+]
