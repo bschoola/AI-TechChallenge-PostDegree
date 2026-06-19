@@ -102,7 +102,25 @@ Na primeira execução o modelo `llama3.2:3b` (~2 GB) será baixado automaticame
 docker compose up --build
 ```
 
-> O modelo é baixado em background pelo serviço `ollama-setup`. Pode parecer parado por alguns minutos durante o download — use `docker compose logs -f` em outro terminal para acompanhar.
+O comando sobe automaticamente três serviços em ordem:
+
+1. **ollama** — servidor de LLM (aguarda ficar saudável antes de continuar)
+2. **ollama-setup** — faz o pull do modelo `llama3.2:3b` (~2 GB) na primeira execução; nas seguintes o modelo já está no volume e o pull é imediato
+3. **prediction-api** — FastAPI com o classificador e integração com Ollama
+4. **front** — Angular servido via nginx
+
+Para acompanhar os logs em tempo real durante a inicialização, abra outro terminal e rode:
+
+```bash
+docker compose logs -f
+```
+
+Para ver apenas um serviço específico:
+
+```bash
+docker compose logs -f api
+docker compose logs -f ollama
+```
 
 ### URLs após inicialização
 
@@ -222,15 +240,21 @@ Documentação completa: [2.PredictionApi/PredictionApi.md](2.PredictionApi/Pred
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/` | Redireciona para `/docs` |
-| `POST` | `/predict/breastCancer` | Predição rápida (classificador) |
+| `GET` | `/` | Redireciona para `/docs` (Swagger UI) |
+| `GET` | `/docs` | Documentação interativa Swagger |
+| `GET` | `/redoc` | Documentação ReDoc |
+| `POST` | `/predict/breastCancer` | Predição rápida via classificador |
 | `POST` | `/predict/breastCancer/laudo` | Predição + laudo médico gerado por LLM |
-| `GET` | `/health` | Status da API, modelo e conexão com Ollama |
+| `GET` | `/health` | Status da API, modelo carregado e conexão com Ollama |
 
-### Exemplo — predição simples
+---
 
+### `POST /predict/breastCancer`
+
+Executa apenas o classificador (Regressão Logística). Resposta rápida, sem LLM.
+
+**Request:**
 ```json
-POST /predict/breastCancer
 {
   "area_pior": 880.5,
   "textura_pior": 25.38,
@@ -239,6 +263,7 @@ POST /predict/breastCancer
 }
 ```
 
+**Response `200`:**
 ```json
 {
   "diagnostico": "Maligno",
@@ -249,13 +274,21 @@ POST /predict/breastCancer
 }
 ```
 
-### Exemplo — predição com laudo
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `diagnostico` | string | `"Maligno"` ou `"Benigno"` |
+| `confianca` | float | Grau de confiança em % (0–100) |
+| `classe` | int | `1` = Maligno, `0` = Benigno |
+| `probabilidade_maligno` | float | Probabilidade bruta (0.0–1.0) |
+| `probabilidade_benigno` | float | Probabilidade bruta (0.0–1.0) |
 
-```json
-POST /predict/breastCancer/laudo
-{ ...mesmos campos... }
-```
+---
 
+### `POST /predict/breastCancer/laudo`
+
+Executa o classificador e, em seguida, gera um laudo médico em português via LLM local (Ollama). Aceita o mesmo body do endpoint acima.
+
+**Response `200`:**
 ```json
 {
   "diagnostico": "Maligno",
@@ -263,9 +296,44 @@ POST /predict/breastCancer/laudo
   "classe": 1,
   "probabilidade_maligno": 0.9473,
   "probabilidade_benigno": 0.0527,
-  "laudo": "LAUDO DE APOIO AO DIAGNÓSTICO\n\nAchados morfológicos: Os parâmetros ..."
+  "laudo": "**Achados morfológicos**\nOs parâmetros morfológicos indicam área tumoral elevada (880.5 mm²)...\n\n**Interpretação**\nO classificador atribuiu diagnóstico de malignidade com 94.73% de confiança...\n\n**Conduta sugerida**\nRecomenda-se encaminhamento para equipe de oncologia...\n\n**Observação importante**\nEste laudo é auxiliar e deve ser validado por médico responsável."
 }
 ```
+
+> O campo `laudo` utiliza markdown (`**negrito**`) renderizado pelo frontend.
+
+**Códigos de erro:**
+
+| Código | Descrição |
+|---|---|
+| `502` | Falha na comunicação com o Ollama |
+| `503` | Modelo classificador ou LLM não carregados |
+
+---
+
+### `GET /health`
+
+Verifica o status de todos os componentes da API.
+
+**Response `200`:**
+```json
+{
+  "status": "ok",
+  "model_loaded": true,
+  "llm_available": true,
+  "ollama_url": "http://ollama:11434",
+  "ollama_model": "llama3.2:3b",
+  "model_experiment": "experiment_3",
+  "model_metrics": {
+    "f1": 0.978,
+    "recall": 0.991,
+    "accuracy": 0.974,
+    "roc_auc": 0.995
+  }
+}
+```
+
+---
 
 ### Stack
 
