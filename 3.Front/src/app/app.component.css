@@ -372,6 +372,45 @@
 
 .btn-secondary:hover { background: var(--primary-light); }
 
+/* ── LAUDO MÉDICO ───────────────────────────────────────────── */
+.laudo-card { margin-top: 0; }
+
+.laudo-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 0 8px;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.spinner--laudo {
+  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
+.laudo-texto {
+  margin-top: 12px;
+  padding: 16px;
+  background: #F8FAFE;
+  border: 1px solid #DBEAFE;
+  border-radius: 8px;
+}
+
+.laudo-pre {
+  margin: 0;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 14px;
+  line-height: 1.75;
+  color: #1E293B;
+}
+
+.laudo-pre strong {
+  color: #1565C0;
+  font-weight: 700;
+}
+
 /* ── DISCLAIMER ─────────────────────────────────────────────── */
 .disclaimer {
   display: flex;

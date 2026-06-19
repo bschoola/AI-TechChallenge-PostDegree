@@ -1,6 +1,6 @@
 # Tech Challenge — OncoLab: Predição de Câncer de Mama com IA
 
-Sistema completo de apoio ao diagnóstico médico composto por três projetos integrados: otimização de modelo com Algoritmo Genético, API de predição em Python e interface clínica em Angular.
+Sistema completo de apoio ao diagnóstico médico composto por três projetos integrados: otimização de modelo com Algoritmo Genético, API de predição em Python com geração de laudo via LLM local, e interface clínica em Angular.
 
 ---
 
@@ -15,13 +15,20 @@ Sistema completo de apoio ao diagnóstico médico composto por três projetos in
                                │ cancer_model.joblib
 ┌──────────────────────────────▼───────────────────────────────────┐
 │  2.PredictionApi  (FastAPI · localhost:8000)                     │
-│  POST /predict/breastCancer                                      │
-│  Carrega o modelo → classifica → retorna diagnóstico + confiança │
+│  POST /predict/breastCancer       → diagnóstico + confiança      │
+│  POST /predict/breastCancer/laudo → diagnóstico + laudo (LLM)    │
 └──────────────────────────────┬───────────────────────────────────┘
-                               │ JSON { diagnostico, confianca, ... }
+                               │                    │
+                    JSON result│          LLM prompt│
+                               │    ┌───────────────▼──────────────┐
+                               │    │  Ollama  (localhost:11434)   │
+                               │    │  Modelo: llama3.2:3b         │
+                               │    │  Gera laudo médico em PT-BR  │
+                               │    └──────────────────────────────┘
+                               │
 ┌──────────────────────────────▼───────────────────────────────────┐
 │  3.Front  (Angular 17 · localhost:4200)                          │
-│  Formulário médico → chama a API → exibe resultado ao médico     │
+│  Formulário → classificação imediata → laudo gerado por LLM      │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -33,42 +40,97 @@ Sistema completo de apoio ao diagnóstico médico composto por três projetos in
 AI-TechChallenge-PostDegree/
 │
 ├── 1.GenAIPrediction/
-│   ├── main.py                    # Pipeline principal: treina, compara e salva o melhor modelo
-│   ├── config.py                  # Espaço de busca do AG e configurações dos 3 experimentos
+│   ├── main.py                    # Pipeline: treina, compara e salva o melhor modelo
+│   ├── config.py                  # Espaço de busca do AG e configurações dos experimentos
 │   ├── requirements.txt
 │   └── src/
-│       ├── data_loader.py         # Carrega o dataset Wisconsin Breast Cancer (CSV remoto)
+│       ├── data_loader.py         # Carrega o dataset Wisconsin Breast Cancer
 │       ├── preprocessing.py       # Feature engineering e divisão treino/teste
 │       ├── models.py              # Pipeline: StandardScaler + LogisticRegression
 │       ├── genetic_algorithm.py   # Seleção, cruzamento, mutação e elitismo
 │       └── evaluation.py          # Métricas: F1, Recall, Accuracy, ROC-AUC
 │
 ├── 2.PredictionApi/
-│   ├── main.py                    # FastAPI: endpoints, schemas Pydantic, CORS
+│   ├── main.py                    # FastAPI: endpoints, schemas Pydantic, CORS, integração Ollama
 │   ├── requirements.txt
+│   ├── Dockerfile
 │   └── PredictionApi.md           # Documentação detalhada da API
 │
-├── ChoosenModel/                  # Gerado ao rodar o projeto 1
-│   ├── cancer_model.joblib        # Pipeline serializado (scaler + modelo fitados)
-│   └── model_metadata.json        # Experimento vencedor, hiperparâmetros e métricas
+├── 3.Front/
+│   ├── src/app/
+│   │   ├── app.component.*        # Formulário + resultado + bloco de laudo
+│   │   └── services/
+│   │       └── prediction.service.ts
+│   ├── nginx.conf                 # Config nginx para container Docker
+│   └── Dockerfile
 │
-└── 3.Front/
-    ├── src/
-    │   ├── styles.css             # Tema médico global (variáveis CSS)
-    │   └── app/
-    │       ├── app.component.*    # Formulário de entrada + tela de resultado
-    │       └── services/
-    │           └── prediction.service.ts  # HttpClient → POST /predict/breastCancer
-    └── angular.json / package.json / tsconfig.json
+├── ChoosenModel/                  # Gerado ao rodar o projeto 1
+│   ├── cancer_model.joblib
+│   └── model_metadata.json
+│
+├── docker-compose.yml             # Orquestra: ollama + api + front
+├── start.sh                       # Script de inicialização (Linux/Mac)
+└── start.ps1                      # Script de inicialização (Windows)
 ```
 
 ---
 
-## Como rodar o projeto completo
+## Como rodar — Docker (recomendado)
 
-> Execute os passos na ordem abaixo. O modelo precisa existir antes de subir a API.
+> Requer apenas **Docker Desktop** instalado e em execução. Nenhuma outra dependência.
 
-### Passo 1 — Gerar o modelo (Fase 1)
+### Opção A — Script interativo (com progresso visível)
+
+O script sobe cada serviço em ordem, aguarda o health check de cada um e exibe o status em tempo real.
+
+**Windows (PowerShell):**
+```powershell
+.\start.ps1
+```
+
+**Linux / Mac:**
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+Na primeira execução o modelo `llama3.2:3b` (~2 GB) será baixado automaticamente com barra de progresso. Nas execuções seguintes o modelo já estará em cache no volume Docker.
+
+### Opção B — docker compose direto
+
+```bash
+docker compose up --build
+```
+
+> O modelo é baixado em background pelo serviço `ollama-setup`. Pode parecer parado por alguns minutos durante o download — use `docker compose logs -f` em outro terminal para acompanhar.
+
+### URLs após inicialização
+
+| Serviço | URL |
+|---|---|
+| Frontend | http://localhost:4200 |
+| API (Swagger) | http://localhost:8000/docs |
+| Ollama | http://localhost:11434 |
+
+### Parar todos os serviços
+
+```bash
+docker compose down
+```
+
+---
+
+## Como rodar — Localmente (sem Docker)
+
+> Siga os passos na ordem. O modelo precisa existir antes de subir a API.
+
+### Pré-requisitos
+
+- Python 3.10+
+- Node.js 20+ e Angular CLI (`npm install -g @angular/cli`)
+- [Ollama](https://ollama.com/download) instalado localmente
+
+### Passo 1 — Gerar o modelo
 
 ```bash
 cd 1.GenAIPrediction
@@ -78,7 +140,14 @@ python main.py
 
 Ao terminar, a pasta `ChoosenModel/` será criada com `cancer_model.joblib` e `model_metadata.json`.
 
-### Passo 2 — Subir a API (Fase 2)
+### Passo 2 — Iniciar o Ollama e baixar o modelo
+
+```bash
+ollama serve                    # inicia o servidor (porta 11434)
+ollama pull llama3.2:3b         # baixa o modelo (~2 GB, só na primeira vez)
+```
+
+### Passo 3 — Subir a API
 
 ```bash
 cd 2.PredictionApi
@@ -88,7 +157,7 @@ uvicorn main:app --reload
 
 API disponível em `http://localhost:8000` · Swagger UI em `http://localhost:8000/docs`
 
-### Passo 3 — Subir o frontend (Fase 3)
+### Passo 4 — Subir o frontend
 
 ```bash
 cd 3.Front
@@ -122,7 +191,7 @@ Encontrar os melhores hiperparâmetros para um modelo de Regressão Logística q
 | `max_iter` | 100 · 200 · 500 · 1000 · 2000 |
 | `class_weight` | None · balanced |
 
-O AG representa cada combinação como um **cromossomo de 4 genes** (índices nas listas acima). O **fitness** é o F1-Score médio em cross-validation de 5 folds, avaliado apenas nos dados de treino.
+O AG representa cada combinação como um **cromossomo de 4 genes**. O **fitness** é o F1-Score médio em cross-validation de 5 folds.
 
 ### 3 Experimentos
 
@@ -133,7 +202,6 @@ O AG representa cada combinação como um **cromossomo de 4 genes** (índices na
 | Taxa de mutação | 30% | 20% | 10% |
 | Taxa de cruzamento | 80% | 80% | 90% |
 | Estratégia | Alta exploração | Balanceado | Alta explotação |
-| Avaliações totais | 200 | 300 | 750 |
 
 ### Métricas
 
@@ -144,19 +212,9 @@ O AG representa cada combinação como um **cromossomo de 4 genes** (índices na
 | **ROC-AUC** | Capacidade de separação entre as duas classes |
 | **Accuracy** | Taxa geral de acerto |
 
-### Saída
-
-O experimento com maior F1-Score no conjunto de teste é serializado em:
-
-```
-ChoosenModel/
-├── cancer_model.joblib     # Pipeline completo pronto para uso em produção
-└── model_metadata.json     # { experiment, hyperparameters, features, metrics, trained_at }
-```
-
 ---
 
-## Fase 2 — API de Predição
+## Fase 2 — API de Predição + LLM
 
 Documentação completa: [2.PredictionApi/PredictionApi.md](2.PredictionApi/PredictionApi.md)
 
@@ -165,10 +223,11 @@ Documentação completa: [2.PredictionApi/PredictionApi.md](2.PredictionApi/Pred
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/` | Redireciona para `/docs` |
-| `POST` | `/predict/breastCancer` | Predição com grau de confiança |
-| `GET` | `/health` | Status da API e métricas do modelo carregado |
+| `POST` | `/predict/breastCancer` | Predição rápida (classificador) |
+| `POST` | `/predict/breastCancer/laudo` | Predição + laudo médico gerado por LLM |
+| `GET` | `/health` | Status da API, modelo e conexão com Ollama |
 
-### Exemplo de requisição
+### Exemplo — predição simples
 
 ```json
 POST /predict/breastCancer
@@ -180,14 +239,31 @@ POST /predict/breastCancer
 }
 ```
 
-### Exemplo de resposta
+```json
+{
+  "diagnostico": "Maligno",
+  "confianca": 94.73,
+  "classe": 1,
+  "probabilidade_maligno": 0.9473,
+  "probabilidade_benigno": 0.0527
+}
+```
+
+### Exemplo — predição com laudo
+
+```json
+POST /predict/breastCancer/laudo
+{ ...mesmos campos... }
+```
 
 ```json
 {
   "diagnostico": "Maligno",
   "confianca": 94.73,
+  "classe": 1,
   "probabilidade_maligno": 0.9473,
-  "probabilidade_benigno": 0.0527
+  "probabilidade_benigno": 0.0527,
+  "laudo": "LAUDO DE APOIO AO DIAGNÓSTICO\n\nAchados morfológicos: Os parâmetros ..."
 }
 ```
 
@@ -196,32 +272,33 @@ POST /predict/breastCancer
 - **Framework:** FastAPI + Uvicorn
 - **Serialização do modelo:** joblib
 - **Validação:** Pydantic v2
-- **CORS:** habilitado para `http://localhost:4200`
+- **LLM:** Ollama via cliente OpenAI-compatível (`openai` Python SDK)
+- **Modelo LLM:** llama3.2:3b (roda localmente, sem dependência de nuvem)
 
 ---
 
 ## Fase 3 — Frontend Angular (OncoLab)
 
+### Fluxo de uso
+
+1. Médico preenche os 4 parâmetros do exame de imagem
+2. O resultado do classificador aparece imediatamente (rápido)
+3. O laudo médico em linguagem clínica é gerado pela LLM e exibido logo em seguida
+
 ### Telas
 
-**Formulário de entrada**
-- 4 campos com descrição clínica, hint de valores típicos e validação
-- Botão desabilitado até todos os campos estarem preenchidos
+**Formulário de entrada** — 4 campos com descrição clínica, hint de valores típicos e validação
 
 **Tela de resultado**
-- Badge colorido: **MALIGNO** (vermelho) ou **BENIGNO** (verde)
-- Percentual de confiança em destaque
+- Badge colorido: **MALIGNO** (vermelho) ou **BENIGNO** (verde) com percentual de confiança
 - Barras de probabilidade para cada classe
-- Resumo dos parâmetros informados com data/hora
-- Disclaimer clínico
-- Botão "Nova Análise"
+- Bloco de laudo médico gerado por IA com indicador de carregamento
 
 ### Stack
 
-- **Framework:** Angular 17 standalone (sem módulos)
+- **Framework:** Angular 17 standalone
 - **HTTP:** `HttpClient` via `PredictionService`
 - **Estilo:** CSS customizado, tema hospitalar azul, responsivo
-- **Fonte:** Inter (Google Fonts)
 
 ---
 

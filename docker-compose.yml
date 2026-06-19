@@ -1,0 +1,77 @@
+services:
+
+  # ------------------------------------------------------------------ #
+  # Ollama — servidor de LLM local (llama3.2:3b)
+  # ------------------------------------------------------------------ #
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Mantém o processo vivo; o modelo é baixado pelo serviço ollama-setup
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+
+  # ------------------------------------------------------------------ #
+  # One-shot: baixa o modelo na primeira execução
+  # ------------------------------------------------------------------ #
+  ollama-setup:
+    image: ollama/ollama:latest
+    container_name: ollama-setup
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["ollama", "pull", "llama3.2:3b"]
+    restart: "no"
+
+  # ------------------------------------------------------------------ #
+  # FastAPI — Prediction API
+  # ------------------------------------------------------------------ #
+  api:
+    build:
+      context: .
+      dockerfile: 2.PredictionApi/Dockerfile
+    container_name: prediction-api
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=llama3.2:3b
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 30s
+
+  # ------------------------------------------------------------------ #
+  # Angular — Frontend (build + nginx)
+  # ------------------------------------------------------------------ #
+  front:
+    build:
+      context: 3.Front
+      dockerfile: Dockerfile
+    container_name: front
+    ports:
+      - "4200:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+    name: ollama_models
