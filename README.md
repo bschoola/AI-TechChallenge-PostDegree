@@ -79,24 +79,6 @@ AI-TechChallenge-PostDegree/
 
 > Requer apenas **Docker Desktop** instalado e em execução. Nenhuma outra dependência.
 
-### Opção A — Script interativo (com progresso visível)
-
-O script sobe cada serviço em ordem, aguarda o health check de cada um e exibe o status em tempo real.
-
-**Windows (PowerShell):**
-```powershell
-.\start.ps1
-```
-
-**Linux / Mac:**
-```bash
-chmod +x start.sh
-./start.sh
-```
-
-Na primeira execução o modelo `llama3.2:3b` (~2 GB) será baixado automaticamente com barra de progresso. Nas execuções seguintes o modelo já estará em cache no volume Docker.
-
-### Opção B — docker compose direto
 
 ```bash
 docker compose up --build
