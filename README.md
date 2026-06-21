@@ -4,6 +4,18 @@ Sistema completo de apoio ao diagnóstico médico composto por três projetos in
 
 ---
 
+## Sumário
+
+- [Interface Clínica](#interface-clínica)
+- [Arquitetura](#arquitetura)
+- [Como rodar — Docker (recomendado)](#como-rodar--docker-recomendado)
+- [Como rodar — Localmente (sem Docker)](#como-rodar--localmente-sem-docker)
+- [Fase 1 — Otimização com Algoritmo Genético](#fase-1--otimização-com-algoritmo-genético)
+- [Fase 2 — API de Predição + LLM](#fase-2--api-de-predição--llm)
+- [Fase 3 — Frontend Angular](#fase-3--frontend-angular-oncotech)
+
+---
+
 ## Interface Clínica
 
 | Formulário de entrada | Resultado + Laudo gerado por IA |
