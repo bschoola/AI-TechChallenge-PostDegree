@@ -271,8 +271,8 @@ O AG representa cada combinação como um **cromossomo de 4 genes**. O **fitness
 ---
 
 ## Fase 2 — API de Predição + LLM
-
-Documentação completa: [2.PredictionApi/PredictionApi.md](2.PredictionApi/PredictionApi.md)
+<!-- 
+Documentação completa: [2.PredictionApi/PredictionApi.md](2.PredictionApi/PredictionApi.md) -->
 
 ### Endpoints
 
@@ -410,4 +410,4 @@ Verifica o status de todos os componentes da API.
 
 ## Aviso
 
-Este sistema é um projeto acadêmico de pós-graduação (FIAP). Os resultados gerados pela IA **não substituem** a avaliação clínica do profissional de saúde e não devem ser usados como única base para decisões diagnósticas.
+Este sistema é um projeto acadêmico de pós-graduação. Os resultados gerados pela IA **não substituem** a avaliação clínica do profissional de saúde e não devem ser usados como única base para decisões diagnósticas.
