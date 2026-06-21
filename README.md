@@ -76,9 +76,7 @@ AI-TechChallenge-PostDegree/
 │   ├── cancer_model.joblib
 │   └── model_metadata.json
 │
-├── docker-compose.yml             # Orquestra: ollama + api + front
-├── start.sh                       # Script de inicialização (Linux/Mac)
-└── start.ps1                      # Script de inicialização (Windows)
+└──docker-compose.yml             # Orquestra: ollama + api + front
 ```
 
 ---
