@@ -1,6 +1,14 @@
-# Tech Challenge — OncoLab: Predição de Câncer de Mama com IA
+# Tech Challenge — OncoTech: Predição de Câncer de Mama com IA
 
 Sistema completo de apoio ao diagnóstico médico composto por três projetos integrados: otimização de modelo com Algoritmo Genético, API de predição em Python com geração de laudo via LLM local, e interface clínica em Angular.
+
+---
+
+## Interface Clínica
+
+| Formulário de entrada | Resultado + Laudo gerado por IA |
+|:---:|:---:|
+| ![Tela de entrada de parâmetros](tela1.jpg) | ![Tela de resultado e laudo](tela2.jpg) |
 
 ---
 
@@ -365,7 +373,7 @@ Verifica o status de todos os componentes da API.
 
 ---
 
-## Fase 3 — Frontend Angular (OncoLab)
+## Fase 3 — Frontend Angular (OncoTech)
 
 ### Fluxo de uso
 

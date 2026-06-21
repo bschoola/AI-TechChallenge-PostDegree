@@ -100,4 +100,8 @@ export class AppComponent {
   get barraBenignoWidth(): string {
     return `${(this.result?.probabilidade_benigno ?? 0) * 100}%`;
   }
+
+  printLaudo(): void {
+    window.print();
+  }
 }

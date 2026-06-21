@@ -1,28 +1,32 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --primary:        #1565C0;
-  --primary-dark:   #0D47A1;
-  --primary-light:  #E3F2FD;
-  --primary-medium: #42A5F5;
-  --bg:             #EEF2F7;
+  --primary:        #1B3A5C;
+  --primary-dark:   #0F2540;
+  --primary-light:  #EBF3FC;
+  --primary-medium: #3178B8;
+  --bg:             #F4F6F9;
   --card-bg:        #FFFFFF;
-  --text:           #1A2332;
-  --text-muted:     #5A6A7E;
-  --border:         #D6E4F0;
-  --shadow:         0 2px 16px rgba(21, 101, 192, 0.10);
-  --danger:         #C62828;
-  --danger-light:   #FFEBEE;
-  --danger-border:  #EF9A9A;
-  --success:        #2E7D32;
-  --success-light:  #E8F5E9;
-  --success-border: #A5D6A7;
-  --radius:         12px;
+  --text:           #0F1C2E;
+  --text-muted:     #5A6B7E;
+  --border:         #D8E3EE;
+  --shadow:         0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.06);
+  --shadow-lg:      0 2px 8px rgba(0,0,0,0.08), 0 12px 40px rgba(0,0,0,0.10);
+  --danger:         #B91C1C;
+  --danger-light:   #FEF2F2;
+  --danger-border:  #FECACA;
+  --success:        #15803D;
+  --success-light:  #F0FDF4;
+  --success-border: #86EFAC;
+  --radius:         10px;
+  --font-ui:        'Inter', system-ui, sans-serif;
+  --font-doc:       'Merriweather', Georgia, 'Times New Roman', serif;
 }
 
 body {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-ui);
   background-color: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
