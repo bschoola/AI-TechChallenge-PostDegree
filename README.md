@@ -79,6 +79,30 @@ AI-TechChallenge-PostDegree/
 
 > Requer apenas **Docker Desktop** instalado e em execução. Nenhuma outra dependência.
 
+### GPU (importante para performance do laudo LLM)
+
+Sem acesso à GPU, o Ollama roda em **CPU only** e o laudo pode levar mais de 1 minuto. O `docker-compose.yml` já inclui configuração de passthrough para **GPU NVIDIA** — mas requer o `nvidia-container-toolkit` instalado no host:
+
+- **Instalar nvidia-container-toolkit:** https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html
+- Após instalar, reinicie o Docker Desktop e suba normalmente com `docker compose up --build`
+
+**Mac com Apple Silicon (M1/M2/M3):** a GPU Metal não tem passthrough para Docker. A alternativa é rodar o Ollama no host e remover os serviços `ollama` e `ollama-setup` do compose, alterando a variável de ambiente da API:
+
+```yaml
+# em docker-compose.yml, serviço api:
+environment:
+  - OLLAMA_URL=http://host.docker.internal:11434
+```
+
+E no terminal do host:
+
+```bash
+ollama serve
+```
+
+**AMD / CPU only:** funciona sem configuração adicional, porém com latência elevada na geração do laudo.
+
+---
 
 ```bash
 docker compose up --build
@@ -134,6 +158,13 @@ docker compose down
 
 ```bash
 cd 1.GenAIPrediction
+python -m venv venv
+
+# Linux/Mac
+source venv/bin/activate
+# Windows
+# venv\Scripts\activate
+
 pip install -r requirements.txt
 python main.py
 ```
@@ -151,6 +182,13 @@ ollama pull llama3.2:3b         # baixa o modelo (~2 GB, só na primeira vez)
 
 ```bash
 cd 2.PredictionApi
+python -m venv venv
+
+# Linux/Mac
+source venv/bin/activate
+# Windows
+# venv\Scripts\activate
+
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```

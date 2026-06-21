@@ -4,7 +4,7 @@
     "C": 0.1,
     "penalty": "l1",
     "solver": "liblinear",
-    "max_iter": 200,
+    "max_iter": 1000,
     "class_weight": null,
     "random_state": 42
   },
@@ -21,6 +21,6 @@
     "f1": 0.95,
     "roc_auc": 0.9993386243386243
   },
-  "trained_at": "2026-06-15T18:10:34.655373",
+  "trained_at": "2026-06-21T09:33:48.310193",
   "model_file": "cancer_model.joblib"
 }

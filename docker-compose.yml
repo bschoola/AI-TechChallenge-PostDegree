@@ -10,6 +10,15 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    # Passthrough de GPU NVIDIA — requer nvidia-container-toolkit no host
+    # Instale com: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     # Mantém o processo vivo; o modelo é baixado pelo serviço ollama-setup
     restart: unless-stopped
     healthcheck:
