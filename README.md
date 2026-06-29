@@ -324,7 +324,29 @@ Executa apenas o classificador (Regressão Logística). Resposta rápida, sem LL
 
 ### `POST /predict/breastCancer/laudo`
 
-Executa o classificador e, em seguida, gera um laudo médico em português via LLM local (Ollama). Aceita o mesmo body do endpoint acima.
+Executa o classificador e enfileira a geração do laudo médico via LLM local (Ollama). Aceita o mesmo body do endpoint acima.
+
+#### Arquitetura de fila para chamadas LLM
+
+O Ollama processa requisições de forma sequencial — sem fila, múltiplas chamadas simultâneas causariam timeouts em cascata. Para suportar concorrência, o endpoint usa **Celery + Redis**: o POST retorna imediatamente com um `task_id` e um worker processa os laudos na ordem de chegada.
+
+```
+Cliente
+  │
+  ├─ POST /predict/breastCancer/laudo
+  │         ◄── { task_id, diagnostico, confianca }   (resposta imediata)
+  │
+  └─ GET /predict/breastCancer/laudo/status/{task_id}  (polling até concluir)
+             ◄── { status: "pending" | "processing" | "completed" | "failed" }
+```
+
+| Etapa | Responsável | Latência esperada |
+|---|---|---|
+| Classificador ML | FastAPI (síncrono) | < 50 ms |
+| Enqueue na fila | Redis | < 100 ms |
+| Geração do laudo | Celery worker → Ollama | 10–60 s (varia com hardware) |
+
+Aceita o mesmo body do endpoint acima.
 
 **Response `200`:**
 ```json

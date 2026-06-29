@@ -1,11 +1,11 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import {
   PredictionService,
   PredictionInput,
   PredictionResponse,
-  LaudoResponse,
 } from './services/prediction.service';
 import { MarkdownPipe } from './pipes/markdown.pipe';
 
@@ -16,7 +16,7 @@ import { MarkdownPipe } from './pipes/markdown.pipe';
   templateUrl: './app.component.html',
   styleUrl: './app.component.css',
 })
-export class AppComponent {
+export class AppComponent implements OnDestroy {
   form: PredictionInput = {
     area_pior: null!,
     textura_pior: null!,
@@ -27,37 +27,60 @@ export class AppComponent {
   result: PredictionResponse | null = null;
   laudo: string | null = null;
   loadingPredict = false;
-  loadingLaudo = false;
+  loadingLaudo   = false;
   error: string | null = null;
   errorLaudo: string | null = null;
   dataAtual = new Date();
 
+  private _pollSub: Subscription | null = null;
+
   constructor(private predictionService: PredictionService) {}
 
+  ngOnDestroy(): void {
+    this._pollSub?.unsubscribe();
+  }
+
   submit(): void {
+    this._pollSub?.unsubscribe();
     this.loadingPredict = true;
-    this.loadingLaudo = false;
-    this.error = null;
-    this.errorLaudo = null;
-    this.result = null;
-    this.laudo = null;
-    this.dataAtual = new Date();
+    this.loadingLaudo   = false;
+    this.error          = null;
+    this.errorLaudo     = null;
+    this.result         = null;
+    this.laudo          = null;
+    this.dataAtual      = new Date();
 
     // Passo 1: classificador rápido
     this.predictionService.predict(this.form).subscribe({
       next: (res) => {
-        this.result = res;
+        this.result         = res;
         this.loadingPredict = false;
 
-        // Passo 2: laudo via LLM (em segundo plano)
+        // Passo 2: dispara geração assíncrona do laudo
         this.loadingLaudo = true;
-        this.predictionService.gerarLaudo(this.form).subscribe({
-          next: (laudoRes) => {
-            this.laudo = laudoRes.laudo;
-            this.loadingLaudo = false;
+        this.predictionService.requestLaudo(this.form).subscribe({
+          next: (laudoAsync) => {
+            // Passo 3: polling até laudo pronto
+            this._pollSub = this.predictionService
+              .pollLaudo(laudoAsync.task_id)
+              .subscribe({
+                next: (status) => {
+                  if (status.status === 'completed') {
+                    this.laudo        = status.laudo ?? null;
+                    this.loadingLaudo = false;
+                  } else if (status.status === 'failed') {
+                    this.errorLaudo   = status.error ?? 'Erro ao gerar o laudo.';
+                    this.loadingLaudo = false;
+                  }
+                },
+                error: () => {
+                  this.errorLaudo   = 'Erro ao verificar status do laudo.';
+                  this.loadingLaudo = false;
+                },
+              });
           },
           error: () => {
-            this.errorLaudo = 'Não foi possível gerar o laudo. Verifique se o serviço de IA está disponível.';
+            this.errorLaudo   = 'Não foi possível iniciar a geração do laudo.';
             this.loadingLaudo = false;
           },
         });
@@ -71,12 +94,13 @@ export class AppComponent {
   }
 
   novaAnalise(): void {
-    this.result = null;
-    this.laudo = null;
-    this.error = null;
-    this.errorLaudo = null;
+    this._pollSub?.unsubscribe();
+    this.result         = null;
+    this.laudo          = null;
+    this.error          = null;
+    this.errorLaudo     = null;
     this.loadingPredict = false;
-    this.loadingLaudo = false;
+    this.loadingLaudo   = false;
     this.form = {
       area_pior: null!,
       textura_pior: null!,
@@ -85,12 +109,12 @@ export class AppComponent {
     };
   }
 
-  get isMaligno(): boolean {
-    return this.result?.diagnostico === 'Maligno';
+  printLaudo(): void {
+    window.print();
   }
 
-  get barraConfiancaWidth(): string {
-    return `${this.result?.confianca ?? 0}%`;
+  get isMaligno(): boolean {
+    return this.result?.diagnostico === 'Maligno';
   }
 
   get barraMalignoWidth(): string {
@@ -99,9 +123,5 @@ export class AppComponent {
 
   get barraBenignoWidth(): string {
     return `${(this.result?.probabilidade_benigno ?? 0) * 100}%`;
-  }
-
-  printLaudo(): void {
-    window.print();
   }
 }
