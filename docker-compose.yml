@@ -42,6 +42,22 @@ services:
     restart: "no"
 
   # ------------------------------------------------------------------ #
+  # One-shot: pré-carrega o modelo na VRAM após o pull
+  # ------------------------------------------------------------------ #
+  ollama-warmup:
+    image: ollama/ollama:latest
+    container_name: ollama-warmup
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-setup:
+        condition: service_completed_successfully
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["ollama", "run", "llama3.2:3b", ""]
+    restart: "no"
+
+  # ------------------------------------------------------------------ #
   # Redis — broker e backend de resultados para o Celery
   # ------------------------------------------------------------------ #
   redis:
@@ -70,8 +86,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      ollama:
-        condition: service_healthy
+      ollama-warmup:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   # ------------------------------------------------------------------ #
@@ -89,10 +105,10 @@ services:
       - OLLAMA_MODEL=llama3.2:3b
       - REDIS_URL=redis://redis:6379/0
     depends_on:
-      ollama:
-        condition: service_healthy
       redis:
         condition: service_healthy
+      ollama-warmup:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
