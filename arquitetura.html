@@ -162,7 +162,62 @@
   .navrow button:hover { color: var(--text); border-color: var(--accent); }
   .navrow .spacer { visibility: hidden; }
 
+  /* ============ RESULTADOS (1B) ============ */
+  .exp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .exp-card {
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px 22px; position: relative; animation: chipIn .5s ease backwards;
+  }
+  .exp-card:nth-child(2) { animation-delay: .12s; }
+  .exp-card:nth-child(3) { animation-delay: .24s; }
+  .exp-card.winner {
+    border-color: var(--m1);
+    box-shadow: 0 0 0 1px var(--m1), 0 14px 34px -12px var(--m1);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--m1) 12%, transparent), var(--card-bg) 70%);
+  }
+  .exp-crown {
+    font-size: 12px; font-weight: 700; color: var(--m1); letter-spacing: 1px;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+  .exp-name { font-size: 15.5px; font-weight: 700; margin-bottom: 14px; }
+  .exp-params { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
+  .exp-params div { font-size: 11px; color: var(--dim); text-align: center; }
+  .exp-params span { display: block; font-size: 19px; font-weight: 700; color: var(--text); }
+  .exp-card.winner .exp-params span { color: var(--m1); }
+
+  .chart-title { font-size: 14px; font-weight: 700; margin-bottom: 18px; }
+  .chart-axis { font-weight: 400; color: var(--dim); font-size: 12px; }
+  .barchart { display: flex; flex-direction: column; gap: 12px; margin-bottom: 30px; }
+  .barrow { display: flex; align-items: center; gap: 14px; }
+  .barlabel { width: 250px; min-width: 180px; font-size: 13px; color: var(--dim); text-align: right; }
+  .bartrack { flex: 1; background: #0e1729; border: 1px solid var(--border); border-radius: 8px; height: 34px; overflow: hidden; }
+  .bar {
+    height: 100%; width: var(--w); background: linear-gradient(90deg, #4c3a86, var(--m1));
+    border-radius: 7px 0 0 7px; display: flex; align-items: center; justify-content: flex-end;
+    animation: growbar 1.1s cubic-bezier(.22,.9,.3,1) backwards;
+  }
+  .bar.base { background: #35496f; }
+  .bar.win { background: linear-gradient(90deg, #6d28d9, #a78bfa); box-shadow: 0 0 18px -2px var(--m1); }
+  .bar i { font-style: normal; font-size: 13px; font-weight: 700; color: #fff; padding-right: 10px; white-space: nowrap; }
+  @keyframes growbar { from { width: 0; } }
+  .barrow:nth-child(1) .bar { animation-delay: .15s; }
+  .barrow:nth-child(2) .bar { animation-delay: .30s; }
+  .barrow:nth-child(3) .bar { animation-delay: .45s; }
+  .barrow:nth-child(4) .bar { animation-delay: .60s; }
+
+  .mtable { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .mtable th {
+    text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--dim); padding: 8px 14px; border-bottom: 1px solid var(--border);
+  }
+  .mtable td { padding: 10px 14px; border-bottom: 1px solid #1a2745; color: var(--text); }
+  .mtable th:not(:first-child), .mtable td:not(:first-child) { text-align: center; font-variant-numeric: tabular-nums; }
+  .mtable .winrow { background: color-mix(in srgb, var(--m1) 9%, transparent); }
+  .mtable .winrow td:first-child { color: var(--m1); font-weight: 700; }
+  .mtable .best { color: #c4b5fd; font-weight: 700; }
+
   #view-1 { --accent: var(--m1); }
+  #view-1b { --accent: var(--m1); }
   #view-2 { --accent: var(--m2); }
   #view-3 { --accent: var(--m3); }
 
@@ -332,6 +387,95 @@
 
     <div class="navrow">
       <button class="spacer">·</button>
+      <button onclick="go('1b')">Resultados dos experimentos →</button>
+    </div>
+  </section>
+
+  <!-- ================= MÓDULO 1B — RESULTADOS ================= -->
+  <section class="view" id="view-1b">
+    <div class="topbar">
+      <button class="back-btn" onclick="go('1')">← GenAIPrediction</button>
+      <div class="mod-title"><h2>Resultados dos Experimentos</h2><span class="badge">Módulo 1 · Avaliação</span></div>
+    </div>
+    <div class="mod-tagline">Baseline vs. 3 configurações do Algoritmo Genético, avaliadas no conjunto de teste. Todos os AGs superaram o baseline.</div>
+
+    <!-- Config cards -->
+    <div class="exp-grid">
+      <div class="exp-card winner">
+        <div class="exp-crown">🏆 Melhor F1-Score</div>
+        <div class="exp-name">Exp1 — Pop. Pequena / Mutação Alta</div>
+        <div class="exp-params">
+          <div><span>10</span>população</div>
+          <div><span>20</span>gerações</div>
+          <div><span>30%</span>mutação</div>
+          <div><span>80%</span>crossover</div>
+        </div>
+      </div>
+      <div class="exp-card">
+        <div class="exp-name">Exp2 — Pop. Média / Mutação Média</div>
+        <div class="exp-params">
+          <div><span>20</span>população</div>
+          <div><span>15</span>gerações</div>
+          <div><span>20%</span>mutação</div>
+          <div><span>80%</span>crossover</div>
+        </div>
+      </div>
+      <div class="exp-card">
+        <div class="exp-name">Exp3 — Pop. Grande / Mutação Baixa</div>
+        <div class="exp-params">
+          <div><span>30</span>população</div>
+          <div><span>25</span>gerações</div>
+          <div><span>10%</span>mutação</div>
+          <div><span>90%</span>crossover</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bar chart -->
+    <div class="stage" style="margin-top:22px">
+      <div class="chart-title">F1-Score no conjunto de teste <span class="chart-axis">(eixo de 0,90 a 1,00 para evidenciar as diferenças)</span></div>
+      <div class="barchart">
+        <div class="barrow">
+          <div class="barlabel">Baseline LR</div>
+          <div class="bartrack"><div class="bar base" style="--w:38.3%"><i>0.9383</i></div></div>
+        </div>
+        <div class="barrow">
+          <div class="barlabel">Exp1 — Pop. Pequena / Mut. Alta</div>
+          <div class="bartrack"><div class="bar win" style="--w:51.2%"><i>0.9512 🏆</i></div></div>
+        </div>
+        <div class="barrow">
+          <div class="barlabel">Exp2 — Pop. Média / Mut. Média</div>
+          <div class="bartrack"><div class="bar" style="--w:51.2%"><i>0.9512</i></div></div>
+        </div>
+        <div class="barrow">
+          <div class="barlabel">Exp3 — Pop. Grande / Mut. Baixa</div>
+          <div class="bartrack"><div class="bar" style="--w:50.0%"><i>0.9500</i></div></div>
+        </div>
+      </div>
+
+      <!-- metrics table -->
+      <table class="mtable">
+        <thead>
+          <tr><th>Modelo</th><th>F1-Score</th><th>Recall</th><th>Accuracy</th><th>ROC-AUC</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Baseline LR</td><td>0.9383</td><td>0.9048</td><td>0.9561</td><td>0.9980</td></tr>
+          <tr class="winrow"><td>Exp1 — Pop. Pequena / Mutação Alta</td><td class="best">0.9512</td><td class="best">0.9286</td><td class="best">0.9649</td><td>0.9977</td></tr>
+          <tr><td>Exp2 — Pop. Média / Mutação Média</td><td class="best">0.9512</td><td class="best">0.9286</td><td class="best">0.9649</td><td>0.9977</td></tr>
+          <tr><td>Exp3 — Pop. Grande / Mutação Baixa</td><td>0.9500</td><td>0.9048</td><td class="best">0.9649</td><td class="best">0.9993</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="chips">
+      <div class="chip"><div class="k">+1.4%</div><div class="v">Ganho de F1-Score do Exp1 sobre o baseline (0.9383 → 0.9512).</div></div>
+      <div class="chip"><div class="k">Recall 0.9286</div><div class="v">Exp1 e Exp2 detectam mais malignos — a métrica que salva vidas.</div></div>
+      <div class="chip"><div class="k">Exploração vence</div><div class="v">População pequena + mutação alta explorou melhor o espaço de busca.</div></div>
+      <div class="chip"><div class="k">Empate técnico</div><div class="v">Exp1 ≈ Exp2: o AG converge para a mesma região ótima de hiperparâmetros.</div></div>
+    </div>
+
+    <div class="navrow">
+      <button onclick="go('1')">← Arquitetura do Módulo 1</button>
       <button onclick="go('2')">Módulo 2 — PredictionApi →</button>
     </div>
   </section>
@@ -511,7 +655,8 @@
 </div>
 
 <script>
-  const views = { home: "view-home", "1": "view-1", "2": "view-2", "3": "view-3" };
+  const views = { home: "view-home", "1": "view-1", "1b": "view-1b", "2": "view-2", "3": "view-3" };
+  const order = ["1", "1b", "2", "3"];
   let current = "home";
 
   function go(id) {
@@ -530,8 +675,13 @@
   document.addEventListener("keydown", e => {
     if (["1", "2", "3"].includes(e.key)) go(e.key);
     else if (e.key === "Escape") go("home");
-    else if (e.key === "ArrowRight" && current !== "home") go(current === "3" ? "home" : String(+current + 1));
-    else if (e.key === "ArrowLeft" && current !== "home") go(current === "1" ? "home" : String(+current - 1));
+    else if (e.key === "ArrowRight" && current !== "home") {
+      const i = order.indexOf(current);
+      go(i === order.length - 1 ? "home" : order[i + 1]);
+    } else if (e.key === "ArrowLeft" && current !== "home") {
+      const i = order.indexOf(current);
+      go(i === 0 ? "home" : order[i - 1]);
+    }
   });
 </script>
 </body>
