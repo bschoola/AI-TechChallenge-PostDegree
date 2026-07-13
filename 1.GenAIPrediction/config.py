@@ -70,8 +70,8 @@ GA_EXPERIMENTS = [
         "population_size": 10,
         "generations": 20,
         "mutation_rate": 0.30,
-        "crossover_rate": 0.80,
-        "tournament_size": 3,
+        "crossover_rate": 0.80, # troca de cromossomos entre indivíduos
+        "tournament_size": 3, # pega pessoas aleatorias para reproduzir mesmo que não seja vencedora
     },
     {
         "name": "Exp2 — Pop. Média / Mutação Média",

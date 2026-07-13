@@ -573,3 +573,320 @@ O Algoritmo Genético funciona bem para este problema porque:
 2. **Avaliar uma combinação é relativamente caro** — cada fitness requer 5 treinos de modelo; o AG avalia muito menos combinações que o Grid Search.
 3. **Soluções similares tendem a ter fitness similar** — `C=0.1` e `C=1` provavelmente dão resultados parecidos, o que torna o cruzamento útil (herdar genes bons de dois pais).
 4. **O elitismo garante convergência** — o resultado nunca piora, apenas mantém ou melhora ao longo das gerações.
+
+---
+
+## `ChoosenModel/` — Modelo salvo e seus metadados
+
+Após os 3 experimentos, o melhor modelo é persistido em disco para ser consumido pela API sem precisar retreinar.
+
+```
+ChoosenModel/
+├── cancer_model.joblib    ← pipeline serializado (StandardScaler + LogisticRegression)
+└── model_metadata.json   ← metadados do experimento vencedor
+```
+
+### `model_metadata.json`
+
+```json
+{
+  "experiment": "Exp1 — Pop. Pequena / Mutação Alta",
+  "hyperparameters": {
+    "C": 0.1, "penalty": "l1", "solver": "liblinear",
+    "max_iter": 1000, "class_weight": null, "random_state": 42
+  },
+  "features": ["area_pior", "textura_pior", "pontos_concavos_pior", "concavidade_pior"],
+  "metrics": {
+    "accuracy": 0.9649,
+    "precision": 1.0,
+    "recall": 0.9048,
+    "f1": 0.95,
+    "roc_auc": 0.9993
+  }
+}
+```
+
+**Por que `joblib` e não `pickle`?** O `joblib` é mais eficiente para arrays NumPy — que é exatamente o que o scikit-learn usa internamente. Pense nele como um `BinaryFormatter` mais performático para objetos de ML.
+
+O `Pipeline` serializado contém **tanto o scaler quanto o modelo** juntos. Quando a API carregar o arquivo e chamar `.predict()`, os dados passarão automaticamente pela normalização antes de chegarem ao classificador — nenhum pré-processamento manual necessário.
+
+---
+
+## `2.PredictionApi/` — API REST + Fila Assíncrona
+
+Esta é a camada de serviço do projeto: recebe os dados do frontend, faz a predição com o modelo salvo e gera um laudo clínico via LLM (Ollama).
+
+### Arquitetura da camada
+
+```
+Browser
+   │
+   ▼
+FastAPI (main.py)          ← porta 8000
+   │  ├─ POST /predict/breastCancer         → predição síncrona (< 50ms)
+   │  └─ POST /predict/breastCancer/laudo  → predição + dispara task no Celery
+   │
+   ├──── Redis (broker) ─────────────────── porta 6379
+   │
+   └──── Celery Worker (tasks.py)
+              └─ chama Ollama → llama3.2:3b → gera laudo
+                                              porta 11434
+```
+
+O ponto central do design é a **separação entre predição e geração do laudo**. A Regressão Logística responde em milissegundos, mas o LLM pode levar 30–60 segundos. Se tudo fosse síncrono, o browser daria timeout. A solução é processar o laudo em background.
+
+---
+
+### `main.py` — FastAPI
+
+#### Lifespan: carregamento do modelo na inicialização
+
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global _model, _metadata
+    _model = joblib.load(MODEL_PATH)           # carrega o Pipeline do disco
+    with open(METADATA_PATH) as f:
+        _metadata = json.load(f)
+    yield                                      # API fica disponível
+```
+
+O `lifespan` é o equivalente ao `Startup.cs` / `Program.cs` no ASP.NET Core: código executado uma vez antes da API começar a atender requisições. O `yield` separa o que acontece antes (startup) do que acontece depois (shutdown). O modelo é carregado **uma única vez** em memória e reutilizado em todas as requisições — exatamente o que um singleton faria no .NET.
+
+#### Schemas Pydantic — validação de entrada e saída
+
+```python
+class BreastCancerInput(BaseModel):
+    area_pior: float = Field(..., gt=0, ...)
+    textura_pior: float = Field(..., gt=0, ...)
+    pontos_concavos_pior: float = Field(..., ge=0, ...)
+    concavidade_pior: float = Field(..., ge=0, ...)
+```
+
+`BaseModel` do Pydantic é o equivalente a um `record` ou DTO com `DataAnnotations` no C#. O FastAPI valida automaticamente o JSON recebido contra esse schema e retorna HTTP 422 com detalhes se algum campo for inválido — sem nenhum código de validação manual.
+
+- `Field(..., gt=0)`: o `...` significa campo obrigatório; `gt=0` significa "maior que zero". É como `[Required]` + `[Range(min, double.MaxValue)]` juntos.
+- `ge=0`: "maior ou igual a zero" (`>=`).
+
+#### Endpoint principal: `POST /predict/breastCancer/laudo`
+
+```python
+def predict_breast_cancer_laudo(data: BreastCancerInput) -> LaudoAsyncResponse:
+    pred = _run_prediction(data)        # 1. predição síncrona com o modelo
+
+    task = gerar_laudo_task.delay(      # 2. enfileira a geração do laudo
+        area_pior=data.area_pior,
+        diagnostico=pred.diagnostico,
+        confianca=pred.confianca,
+        ...
+    )
+
+    return LaudoAsyncResponse(**pred.model_dump(), task_id=task.id)  # 3. retorna imediatamente
+```
+
+O `.delay()` do Celery enfileira a tarefa no Redis e retorna um `task_id` instantaneamente — sem esperar o LLM terminar. O cliente recebe a predição em < 100ms e usa o `task_id` para fazer polling.
+
+#### Função de predição: `_run_prediction`
+
+```python
+def _run_prediction(data: BreastCancerInput) -> PredictionResponse:
+    features = [[data.area_pior, data.textura_pior,
+                 data.pontos_concavos_pior, data.concavidade_pior]]
+
+    classe         = int(_model.predict(features)[0])
+    probabilidades = _model.predict_proba(features)[0]
+    prob_benigno   = round(float(probabilidades[0]), 4)
+    prob_maligno   = round(float(probabilidades[1]), 4)
+    confianca      = round(float(probabilidades[classe]) * 100, 2)
+    ...
+```
+
+- `features` é uma lista de listas — o scikit-learn espera uma matriz 2D onde cada linha é uma amostra. Mesmo com uma única amostra, é necessário o `[[...]]`.
+- `predict_proba(features)[0]` retorna um array com a probabilidade de cada classe: `[prob_benigno, prob_maligno]`.
+- `probabilidades[classe]` pega a probabilidade da classe prevista — que é usada como "confiança do modelo".
+
+#### Endpoint de polling: `GET /predict/breastCancer/laudo/status/{task_id}`
+
+```python
+def laudo_status(task_id: str) -> LaudoStatusResponse:
+    result = AsyncResult(task_id, app=celery_app)
+    state_map = {
+        "PENDING": "pending", "STARTED": "processing",
+        "SUCCESS": "completed", "FAILURE": "failed",
+    }
+    status = state_map.get(result.state, "processing")
+    laudo = result.result if status == "completed" else None
+    ...
+```
+
+O `AsyncResult` consulta o Redis para saber o estado da tarefa. O frontend chama esse endpoint a cada 2 segundos até receber `"completed"` — padrão clássico de **polling assíncrono**, similar ao `IAsyncResult` + loop de verificação no .NET.
+
+---
+
+### `tasks.py` — Celery Worker e Geração do Laudo
+
+#### Configuração do Celery
+
+```python
+celery_app = Celery("oncotech", broker=REDIS_URL, backend=REDIS_URL)
+
+celery_app.conf.update(
+    result_expires=3600,           # laudos ficam no Redis por 1 hora
+    worker_prefetch_multiplier=1,  # processa uma tarefa por vez — respeita GPU única
+)
+```
+
+O Celery usa o Redis como **broker** (fila de tarefas) e como **backend** (armazena resultados). O `worker_prefetch_multiplier=1` é crítico aqui: garante que o worker não pegue duas tarefas ao mesmo tempo, evitando que dois processos disputem a GPU do Ollama.
+
+#### A tarefa: `gerar_laudo_task`
+
+```python
+@celery_app.task(name="tasks.gerar_laudo", bind=True, max_retries=2)
+def gerar_laudo_task(self, area_pior, textura_pior, ..., diagnostico, confianca, ...):
+    client = OpenAI(base_url=f"{OLLAMA_URL}/v1", api_key="ollama")
+    ...
+    try:
+        response = client.chat.completions.create(
+            model=OLLAMA_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=400,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=5)   # tenta novamente em 5s
+```
+
+**Por que `OpenAI` client para chamar o Ollama?** O Ollama expõe uma API compatível com o formato da OpenAI em `/v1`. Isso permite usar o SDK oficial da OpenAI apontando para o servidor local — `base_url` e `api_key="ollama"` (qualquer string) fazem o redirecionamento.
+
+**`temperature=0.2`**: quanto mais próximo de 0, mais determinístico e conservador o LLM fica. Para um laudo médico, isso é desejável — queremos consistência, não criatividade.
+
+**`max_retries=2` + `self.retry(countdown=5)`**: se o Ollama estiver ocupado ou retornar erro, a tarefa é recolocada na fila após 5 segundos, até 2 tentativas adicionais. É o equivalente a um `Polly RetryPolicy` no .NET.
+
+#### O prompt
+
+O prompt instrui o LLM a agir como assistente médico em oncologia mamária e estrutura o laudo em quatro parágrafos fixos: **Achados morfológicos**, **Interpretação**, **Conduta sugerida** e **Observação importante**. As regras explícitas ("NÃO inclua campos em branco", "máximo 200 palavras") são essenciais para controlar a saída do modelo — LLMs sem restrições tendem a produzir conteúdo variável e imprevisível.
+
+---
+
+## `3.Front/` — Frontend Angular
+
+O frontend é uma SPA (Single Page Application) em Angular que consome a API e apresenta o resultado ao usuário.
+
+### Fluxo completo na interface
+
+```
+Usuário preenche os 4 campos e clica "Iniciar Análise"
+        ↓
+POST /predict/breastCancer/laudo
+        ↓
+Exibe imediatamente: diagnóstico, confiança, probabilidades
+        ↓
+Inicia polling a cada 2s → GET /predict/breastCancer/laudo/status/{task_id}
+        ↓
+Quando status = "completed" → exibe o laudo clínico no documento
+```
+
+### `prediction.service.ts` — Service Angular
+
+O service encapsula toda a comunicação com a API. Equivale a um `HttpClient` wrapper no .NET.
+
+```typescript
+requestLaudo(input: PredictionInput): Observable<LaudoAsyncResponse> {
+    return this.http.post<LaudoAsyncResponse>(
+        `${this.apiUrl}/predict/breastCancer/laudo`, input
+    );
+}
+
+pollLaudo(taskId: string): Observable<LaudoStatusResponse> {
+    return interval(POLL_INTERVAL_MS).pipe(          // emite a cada 2s
+        switchMap(() =>
+            this.http.get<LaudoStatusResponse>(
+                `${this.apiUrl}/predict/breastCancer/laudo/status/${taskId}`
+            ).pipe(catchError(() => EMPTY))          // ignora erros de rede
+        ),
+        takeWhile(
+            (r) => r.status !== 'completed' && r.status !== 'failed',
+            true   // inclui o último emit que encerrou o loop
+        )
+    );
+}
+```
+
+`interval(2000).pipe(switchMap(...))` é o padrão RxJS para polling: a cada 2 segundos, cancela a requisição anterior (se ainda estiver em andamento) e inicia uma nova. `takeWhile(..., true)` para o Observable assim que o status terminal for recebido, evitando requisições infinitas.
+
+### `app.component.html` — Interface
+
+A interface é dividida em duas áreas principais que aparecem em sequência:
+
+**Antes da análise:** formulário com os 4 campos do exame (`area_pior`, `textura_pior`, `pontos_concavos_pior`, `concavidade_pior`) e validação Angular (`[(ngModel)]`, `required`, `min`).
+
+**Após a análise:** duas colunas lado a lado — à esquerda, o diagnóstico com barras de probabilidade e os parâmetros informados; à direita, o laudo clínico formatado como documento médico (com cabeçalho, corpo em Markdown renderizado e rodapé com aviso de responsabilidade e botão de impressão).
+
+O banner de diagnóstico muda visualmente dependendo do resultado: vermelho para Maligno, verde para Benigno — usando classes CSS condicionais (`[class.diagnosis-banner--maligno]="isMaligno"`).
+
+---
+
+## Infraestrutura — `docker-compose.yml`
+
+O projeto inteiro sobe com um único `docker compose up`. A ordem de inicialização é controlada por `depends_on` com `healthcheck`.
+
+```
+docker compose up
+        ↓
+ollama (porta 11434)          ← healthcheck: "ollama list"
+        ↓
+ollama-setup                  ← baixa llama3.2:3b (one-shot)
+        ↓
+ollama-warmup                 ← pré-carrega o modelo na VRAM (one-shot)
+        ↓
+redis (porta 6379)            ← healthcheck: "redis-cli ping"
+        ↓
+celery-worker + api           ← dependem do warmup + redis
+        ↓
+front (porta 4200)            ← só sobe após a API passar no healthcheck
+```
+
+### Por que o `ollama-warmup`?
+
+O `keep_alive` padrão do Ollama descarrega o modelo da VRAM após 5 minutos de inatividade. Sem o warmup, a **primeira requisição** após o cold start carregaria o modelo (~5–10s de espera). O warmup resolve isso: o modelo já está na VRAM quando a API e o worker sobem, garantindo latência baixa desde a primeira chamada.
+
+### Variáveis de ambiente relevantes
+
+| Variável | Valor | Onde é usada |
+|---|---|---|
+| `OLLAMA_HOST` | `http://ollama:11434` | ollama-setup e warmup |
+| `OLLAMA_URL` | `http://ollama:11434` | celery-worker e api |
+| `OLLAMA_MODEL` | `llama3.2:3b` | celery-worker e api |
+| `REDIS_URL` | `redis://redis:6379/0` | celery-worker e api |
+
+Os containers se comunicam pelo nome do serviço (ex: `ollama`, `redis`) — o Docker resolve esses nomes como DNS interno na rede criada pelo Compose.
+
+---
+
+## Fluxo completo de ponta a ponta
+
+Para fechar, o caminho percorrido por uma única requisição do usuário até o laudo final:
+
+```
+1. Usuário preenche o formulário Angular e clica em "Iniciar Análise"
+
+2. Angular → POST /predict/breastCancer/laudo (FastAPI)
+   └─ FastAPI chama _run_prediction()
+      └─ Pipeline.predict([[880.5, 25.38, 0.2654, 0.3001]])
+         └─ StandardScaler normaliza os dados
+         └─ LogisticRegression classifica → "Maligno" (confiança: 94.7%)
+   └─ FastAPI enfileira gerar_laudo_task.delay(...) no Redis
+   └─ Retorna imediatamente: diagnóstico + task_id
+
+3. Angular exibe o diagnóstico e inicia polling a cada 2s
+
+4. Celery Worker pega a tarefa do Redis
+   └─ Monta o prompt com os dados do exame e o diagnóstico
+   └─ Chama Ollama (llama3.2:3b) via API compatível com OpenAI
+   └─ LLM gera o laudo em Markdown (~30–60s)
+   └─ Celery salva o laudo no Redis com o task_id
+
+5. Polling do Angular detecta status = "completed"
+   └─ Exibe o laudo renderizado como documento médico na interface
+```
